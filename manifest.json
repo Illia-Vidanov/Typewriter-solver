@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Typewriter solver",
+  "description": "Very small chrome extension that automatically types on https://at4.typewriter.at/",
+  "version": "0.1",
+  "minimum_chrome_version": "93",
+  "permissions":
+  [
+    "scripting",
+    "activeTab"
+  ],
+  "action":
+  {
+    "default_icon": "images/Cover128.png"
+  },
+  "icons":
+  {
+    "128": "images/Cover128.png",
+    "96": "images/Cover96.png",
+    "64": "images/Cover64.png",
+    "32": "images/Cover32.png",
+    "16": "images/Cover16.png"
+  },
+  "background":
+  {
+    "service_worker": "background/background.js",
+    "type": "module"
+  }
+}
