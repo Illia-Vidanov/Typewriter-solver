@@ -2,6 +2,15 @@ function Lerp(a, b, t) {
   return a + t * (b - a);
 }
 
+function Clamp(value, min, max)
+{
+  if(value > max)
+    return max;
+  else if(value < min)
+    return min;
+  return value;
+}
+
 function GetElementWithStyleAttribute(style_attribute)
 {
   const all_elements_with_style = document.querySelectorAll("*[style]");
@@ -24,9 +33,24 @@ function PrintLetter(key)
 function main()
 {
   // Approximate error percentage to do in one lecture (0-1)
-  const ERROR_PERCENTAGE = 0.005; // 0.5%
-  const MIN_TYPE_DELAY_MS = 50;
-  const MAX_TYPE_DELAY_MS = 80;
+  let ERROR_PERCENTAGE;
+  let MIN_TYPE_DELAY_MS;
+  let MAX_TYPE_DELAY_MS;
+  chrome.storage.sync.get({
+    error_percentage: 0.005, // 0.5%
+    min_type_delay_ms: 50,
+    max_type_delay_ms: 80
+  }, (storage_cache) => {
+    ERROR_PERCENTAGE = Clamp(storage_cache.error_percentage, 0, 1);
+    if(storage_cache.min_type_delay_ms > storage_cache.max_type_delay_ms)
+    {
+      // Swap variables if they min is larger than max
+      MIN_TYPE_DELAY_MS = storage_cache.max_type_delay_ms;
+      MAX_TYPE_DELAY_MS = storage_cache.min_type_delay_ms;
+    }
+    MIN_TYPE_DELAY_MS = storage_cache.min_type_delay_ms;
+    MAX_TYPE_DELAY_MS = storage_cache.max_type_delay_ms;
+  });
 
   // Can't use id because they are unique every time
   let next_letter_element = GetElementWithStyleAttribute("position: relative; float: left; background: rgba(84,84,84,0.2);");

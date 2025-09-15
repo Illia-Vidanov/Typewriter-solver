@@ -7,7 +7,8 @@
   "permissions":
   [
     "scripting",
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "action":
   {
@@ -25,5 +26,9 @@
   {
     "service_worker": "background/background.js",
     "type": "module"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
   }
 }
