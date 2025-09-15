@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Typewriter solver",
-  "description": "Very small chrome extension that automatically types on https://at4.typewriter.at/",
-  "version": "0.1",
+  "description": "Very small chrome extension that automatically types on https://at4.typewriter.at/\nHow to use: pin extension in chrome. Go to the lecture you want to solve on the site, click on the icon in extension menu. Boom! It's working till the end of the lecture.",
+  "version": "1.0",
   "minimum_chrome_version": "93",
   "permissions":
   [
