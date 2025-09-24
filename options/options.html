@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-  <script src="options.js"></script>
+  <script type="module" src="options.js"></script>
   <body>
     <a title="Default value = 0.005 (0.5%)"> <!--Way to make a tooltip-->
       <label for="error_percentage">Error percentage (0.0-1.0)</label>
@@ -8,7 +8,7 @@
     </a>
     <br>
     <a title="Default value = 50 and 80">
-      <label for="delay_interval_min">Delay interval</label>
+      <label for="delay_interval_min">Delay interval in ms</label>
       <input type="number" step="5" min="1" max="100000" id="min_type_delay_ms">
       <input type="number" step="5" min="1" max="100000" id="max_type_delay_ms">
     </a>
