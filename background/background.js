@@ -12,6 +12,17 @@ async function GetCurrentTab() {
 async function InjectionScript(storage_cache) {
   console.log("Injecting script");
   
+  console.log(new KeyboardEvent('keypress', {
+      key: "K",
+      code: "KeyK"
+    }));
+
+    document.getElementById("input_area").dispatchEvent(new KeyboardEvent('keypress', {
+      key: "K",
+      code: "KeyK"
+    }));
+
+  return;
   let stop = false;
   chrome.runtime.onMessage.addListener(message => {
     stop = message.stop;
@@ -24,7 +35,6 @@ async function InjectionScript(storage_cache) {
       if(element.getAttribute("style") == style_attribute)
         return element;
     }
-    console.log("Couldn't find element with style: " + style_attribute);
     return undefined;
   }
 
@@ -47,9 +57,21 @@ async function InjectionScript(storage_cache) {
   }
 
   // Can't use id because they are unique every time
+  // Need to try different variants because it's randomized
   let next_letter_element = GetElementWithStyleAttribute("position: relative; float: left; background: rgba(84,84,84,0.2);");
   if(!next_letter_element)
-    return;
+    next_letter_element = GetElementWithStyleAttribute("float: left; position: relative; background: rgba(84,84,84,0.2);");
+  if(!next_letter_element)
+    next_letter_element = GetElementWithStyleAttribute("float: left; background: rgba(84,84,84,0.2); position: relative;");
+  if(!next_letter_element)
+    next_letter_element = GetElementWithStyleAttribute("position: relative; background: rgba(84,84,84,0.2); float: left;");
+  if(!next_letter_element)
+    next_letter_element = GetElementWithStyleAttribute("background: rgba(84,84,84,0.2); position: relative; float: left;");
+  if(!next_letter_element)
+    next_letter_element = GetElementWithStyleAttribute("background: rgba(84,84,84,0.2); float: left; position: relative;");
+  if(!next_letter_element)
+    console.log("couldn't find next_letter_element using style background: rgba(84,84,84,0.2); float: left; position: relative; and 5 other variations");
+  
   console.log("Next letter id: " + next_letter_element.id);
 
   // Approximate error percentage to do in one lecture (0-1)
