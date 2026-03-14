@@ -1,0 +1,7 @@
+{
+  "name": "com.tolik708.typewriter_solver",
+  "description": "Native host for extension Typewriter-solver to emulate keystrokes",
+  "path": "/home/tolik708/.config/google-chrome/NativeMessagingHosts/com.tolik708.typewriter_solver.exe",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://lffdhbmndnhhlgffecjghndehipjidmj/"]
+}

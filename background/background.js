@@ -1,5 +1,7 @@
 import { GetStorageChache } from "../scripts/common.js";
 
+var is_running = false;
+
 async function GetCurrentTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if(!tab)
@@ -7,20 +9,8 @@ async function GetCurrentTab() {
   return tab;
 }
 
-
-
 async function InjectionScript(storage_cache) {
   console.log("Injecting script");
-  
-  console.log(new KeyboardEvent('keypress', {
-      key: "K",
-      code: "KeyK"
-    }));
-
-    document.getElementById("input_area").dispatchEvent(new KeyboardEvent('keypress', {
-      key: "K",
-      code: "KeyK"
-    }));
 
   return;
   let stop = false;
@@ -125,8 +115,27 @@ async function InjectionScript(storage_cache) {
 }
 
 chrome.action.onClicked.addListener(async () => {
+  console.log("service worker onClicked")
+
   let tab_id = (await GetCurrentTab()).id;
-  chrome.tabs.sendMessage(tab_id, { stop: true });
+  // Stop running content script
+  if(is_running)
+    chrome.tabs.sendMessage(tab_id, { stop: true });
+
+  
+  let host_port = chrome.runtime.connectNative("com.tolik708.typewriter_solver");
+  host_port.onMessage.addListener(function (msg) {
+  console.log('Received' + msg);
+});
+  host_port.onDisconnect.addListener(() => {
+    console.log("Disconnected");
+  });
+  // Treat every message as a key to press
+  chrome.runtime.onMessage.addListener((key) => {
+    console.log(key);
+  });
+  
+  is_running = true;
   chrome.scripting.executeScript({
     target: { tabId: tab_id },
     func: InjectionScript,
