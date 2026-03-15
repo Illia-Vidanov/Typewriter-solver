@@ -12,26 +12,36 @@ async function GetCurrentTab() {
 async function InjectionScript(storage_cache) {
   console.log("Injecting script");
 
-  return;
   let stop = false;
   chrome.runtime.onMessage.addListener(message => {
     stop = message.stop;
   });
 
   // Functions (must define them hiere because I can't import files in Injected file and this function is called from another context)
+  const all_elements_with_style = document.querySelectorAll("*[style]");
   function GetElementWithStyleAttribute(style_attribute) {
-    const all_elements_with_style = document.querySelectorAll("*[style]");
     for(const element of all_elements_with_style) {
       if(element.getAttribute("style") == style_attribute)
         return element;
     }
+
     return undefined;
   }
 
-  function PrintLetter(key) {
-    document.getElementById("input_area").dispatchEvent(new KeyboardEvent('keypress', {
-      key: key
-    }));
+  function GetElementWithShuffledStyleAttributes(style_attributes, begin = "") {
+    if(style_attributes.length == 1)
+      return GetElementWithStyleAttribute((begin + style_attributes[0]).trim());
+    
+    for(const attribute of style_attributes) {
+      let element = GetElementWithShuffledStyleAttributes(style_attributes.toSpliced(style_attributes.indexOf(attribute), 1), begin + attribute);
+      if(element)
+        return element;
+    }
+  }
+
+  let worker_port = chrome.runtime.connect();
+  function PrintLetter(symbol) {
+    worker_port.postMessage(symbol);
   }
 
   function Lerp(a, b, t) {
@@ -48,17 +58,8 @@ async function InjectionScript(storage_cache) {
 
   // Can't use id because they are unique every time
   // Need to try different variants because it's randomized
-  let next_letter_element = GetElementWithStyleAttribute("position: relative; float: left; background: rgba(84,84,84,0.2);");
-  if(!next_letter_element)
-    next_letter_element = GetElementWithStyleAttribute("float: left; position: relative; background: rgba(84,84,84,0.2);");
-  if(!next_letter_element)
-    next_letter_element = GetElementWithStyleAttribute("float: left; background: rgba(84,84,84,0.2); position: relative;");
-  if(!next_letter_element)
-    next_letter_element = GetElementWithStyleAttribute("position: relative; background: rgba(84,84,84,0.2); float: left;");
-  if(!next_letter_element)
-    next_letter_element = GetElementWithStyleAttribute("background: rgba(84,84,84,0.2); position: relative; float: left;");
-  if(!next_letter_element)
-    next_letter_element = GetElementWithStyleAttribute("background: rgba(84,84,84,0.2); float: left; position: relative;");
+  let style_attributes = ["background: rgba(84,84,84,0.2); ", "float: left; ", "position: relative; "];
+  let next_letter_element = GetElementWithShuffledStyleAttributes(style_attributes);
   if(!next_letter_element)
     console.log("couldn't find next_letter_element using style background: rgba(84,84,84,0.2); float: left; position: relative; and 5 other variations");
   
@@ -82,7 +83,12 @@ async function InjectionScript(storage_cache) {
   console.log("Loaded options:", "\nERROR_PERCENTAGE = ", ERROR_PERCENTAGE, "\nMIN_TYPE_DELAY_MS = ", MIN_TYPE_DELAY_MS, "\nMAX_TYPE_DELAY_MS = ", MAX_TYPE_DELAY_MS);
 
   // Need to print first letter to get total char count
-  PrintLetter(next_letter_element.innerHTML);
+  console.log("Emulating ", decodeURIComponent(next_letter_element.textContent));
+  PrintLetter(decodeURIComponent(next_letter_element.textContent));
+  //await new Promise(r => setTimeout(r, 0));
+  //PrintLetter(next_letter_element.innerHTML.charCodeAt(0));
+  worker_port.disconnect();
+  return;
   const letters_left_element = GetElementWithStyleAttribute("z-index: 999; position: relative; float: left; margin-left: 2px; top: -2px; font-weight: bold;");
   if(!letters_left_element) {
     console.warn("Couldn't get char count left. Probobly can't type now. Stop");
@@ -114,6 +120,29 @@ async function InjectionScript(storage_cache) {
   setTimeout(MainLoop);
 }
 
+// Treat every message as a key to press
+function OnMessage(symbol) {
+  console.log("Emulating ", symbol);
+  host_port.postMessage({symbol: symbol});
+}
+chrome.runtime.onConnect.addListener((port) => {
+  console.log("Content script and service worker connected");
+  port.onMessage.addListener(OnMessage);
+  port.onDisconnect.addListener((port) => {
+    console.log("Content script and service worker disconnected");
+    port.onMessage.removeListener(OnMessage);
+  });
+});
+
+// We need only one host in order to function properly
+let host_port = chrome.runtime.connectNative("com.tolik708.typewriter_solver");
+host_port.onMessage.addListener(function (msg) {
+  console.log("Message from host: " + JSON.stringify(msg));
+});
+host_port.onDisconnect.addListener(() => {
+  console.log("Native host disconnected");
+});
+
 chrome.action.onClicked.addListener(async () => {
   console.log("service worker onClicked")
 
@@ -121,20 +150,6 @@ chrome.action.onClicked.addListener(async () => {
   // Stop running content script
   if(is_running)
     chrome.tabs.sendMessage(tab_id, { stop: true });
-
-  
-  let host_port = chrome.runtime.connectNative("com.tolik708.typewriter_solver");
-  host_port.onMessage.addListener(function (msg) {
-    console.log("Message from host: " + JSON.stringify(msg));
-  });
-  host_port.onDisconnect.addListener(() => {
-    console.log("Native host disconnected");
-  });
-  // Treat every message as a key to press
-  chrome.runtime.onMessage.addListener((key) => {
-    console.log(key);
-  });
-  host_port.postMessage({key: "123123123"});
   
   is_running = true;
   chrome.scripting.executeScript({
