@@ -125,15 +125,16 @@ chrome.action.onClicked.addListener(async () => {
   
   let host_port = chrome.runtime.connectNative("com.tolik708.typewriter_solver");
   host_port.onMessage.addListener(function (msg) {
-  console.log('Received' + msg);
-});
+    console.log("Message from host: " + JSON.stringify(msg));
+  });
   host_port.onDisconnect.addListener(() => {
-    console.log("Disconnected");
+    console.log("Native host disconnected");
   });
   // Treat every message as a key to press
   chrome.runtime.onMessage.addListener((key) => {
     console.log(key);
   });
+  host_port.postMessage({key: "123123123"});
   
   is_running = true;
   chrome.scripting.executeScript({

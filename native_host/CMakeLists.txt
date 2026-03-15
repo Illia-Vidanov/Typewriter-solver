@@ -2,6 +2,18 @@ cmake_minimum_required(VERSION 3.12)
 
 project(TypewriterSolverHost)
 
+# Dependencies
+include(FetchContent)
+
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json
+  GIT_TAG 55f93686c01528224f448c19128836e7df245f72
+  EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# Target
 add_executable(${PROJECT_NAME} main.cpp)
 
 set_target_properties(
@@ -27,6 +39,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
-  PUBLIC X11
-  PUBLIC Xtst
+  PRIVATE X11
+  PRIVATE Xtst
+  PRIVATE nlohmann_json
 )
