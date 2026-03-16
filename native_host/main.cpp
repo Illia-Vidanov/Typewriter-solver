@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <thread>
+#include <cstdlib>
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
