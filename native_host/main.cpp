@@ -149,7 +149,7 @@ void PressKey(Display* display, const std::string& symbol) noexcept
     { "#",  { XK_numbersign,  0 } },
     { "*",  { XK_asterisk,    kShiftKeycode } },
     { "+",  { XK_plus,        0 } },
-    { "\'",  { XK_apostrophe, kShiftKeycode } },
+    { "\'", { XK_apostrophe, kShiftKeycode } },
     { ",",  { XK_colon,       0 } },
     { ".",  { XK_period,      0 } },
     { "-",  { XK_minus,       0 } },
@@ -165,14 +165,14 @@ void PressKey(Display* display, const std::string& symbol) noexcept
   CharKeysymMapType::const_iterator it = kCharKeysymMap.find(symbol);
   if(it == kCharKeysymMap.end())
   {
-    SendErrorString("Unknown key");
+    SendErrorString("Unknown key \"" + symbol + "\" " + std::to_string(static_cast<uint8_t>(symbol[0])));
     return;
   }
 
   const uint8_t keycode = XKeysymToKeycode(display, it->second.first);
   if(keycode == 0)
   {
-    SendErrorMessage("Couldn't convert keysym to keycode");
+    SendErrorMessage("Couldn't convert keysym \"" + std::to_string(it->second.first) + "\"to keycode");
     return;
   }
 

@@ -83,8 +83,8 @@ async function InjectionScript(storage_cache) {
   console.log("Loaded options:", "\nERROR_PERCENTAGE = ", ERROR_PERCENTAGE, "\nMIN_TYPE_DELAY_MS = ", MIN_TYPE_DELAY_MS, "\nMAX_TYPE_DELAY_MS = ", MAX_TYPE_DELAY_MS);
 
   // Need to print first letter to get total char count
-  console.log("Emulating ", decodeURIComponent(next_letter_element.textContent));
-  PrintLetter(decodeURIComponent(next_letter_element.textContent));
+  console.log("Emulating ", next_letter_element.textContent);
+  PrintLetter(next_letter_element.textContent.replaceAll("\u00a0", " "));
   //await new Promise(r => setTimeout(r, 0));
   //PrintLetter(next_letter_element.innerHTML.charCodeAt(0));
   worker_port.disconnect();
