@@ -9,6 +9,17 @@
 
 #include <X11/XKBlib.h>
 
+/*
+Next
+
+So I am trying to change keyboard layout using XKBlib and almost got it
+Right now XkbSetNames doesn't work and I don't know why
+I guess that I should be changing not groups but symbols, but not sure
+
+We should better analyse XkbGetKeyboard(display, XkbAllComponentsMask, XkbUseCoreKbd); to see what actually changes when I call setxkbmap ...
+And we should check if this changes are made after XkbSetNames by calling XkbGetKeyboard again.
+*/
+
 int main()
 {
   int event_code;
@@ -45,20 +56,32 @@ int main()
     std::cerr << "Failed to get keyboard description." << std::endl;
     return 1;
   }
-  std::cout << kbd->names->groups[0] << ' ' << XInternAtom(display, "German", False) << '\n';
-  Atom de_atom = XInternAtom(display, "German", False);
-  kbd->names->groups[0] = de_atom;
+  char *symbols_name = XGetAtomName(display, kbd->names->symbols);
+  std::cout << symbols_name << '\n';
 
-  if(!XkbSetNames(display, XkbGroupNamesMask, 0, 1, kbd))
+  XkbComponentNamesRec names;
+  char symbols[] = "+pc+us+inet(evdev)+terminate(ctrl_alt_bksp)";
+  names.keymap = NULL;
+  names.keycodes = NULL;
+  names.types = NULL;
+  names.compat = NULL;
+  names.symbols = symbols;
+  names.geometry = NULL;
+  XkbDescPtr kbd1 = XkbGetKeyboardByName(display, XkbUseCoreKbd, &names, XkbGBN_AllComponentsMask, XkbGBN_AllComponentsMask, True);
+
+  /*kbd = XkbGetKeyboard(display, XkbAllComponentsMask, XkbUseCoreKbd);
+  if(!kbd)
   {
-    std::cout << "Failed to update keyboard group" << std::endl;
+    std::cerr << "Failed to get keyboard description." << std::endl;
     return 1;
   }
 
-  //std::cout << XkbSetMap(display, XkbGroupNamesMask, kbd);
+  std::cout << kbd->names->groups[0] << '\n';*/
 
   std::cin.get();
+  XFree(symbols_name);
   XkbFreeKeyboard(kbd, XkbAllComponentsMask, True);
-
+  XkbFreeKeyboard(kbd1, XkbAllComponentsMask, True);
+  XCloseDisplay(display);
   return 0;
 }
