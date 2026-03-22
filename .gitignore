@@ -1,3 +1,5 @@
 .vscode
 Typewriter-solver.zip
 native_host/build
+# Temp
+native_host/src

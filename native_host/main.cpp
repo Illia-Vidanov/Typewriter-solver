@@ -7,9 +7,13 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
+#include <X11/XKBlib.h>
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+
+
+constexpr std::chrono::milliseconds kFetchDelay = std::chrono::milliseconds{10};
 
 // For debuging and testing purpuses
 void SendMessage(const json& message_json) noexcept
@@ -23,6 +27,7 @@ void SendMessage(const json& message_json) noexcept
   std::cout.flush();
 }
 
+// Open chrome with "google-chrome-stable --enable-logging=stderr --log-level=0" to view errors
 void SendErrorMessage(const json& message_json) noexcept
 {
   const std::string& message = message_json.dump();
@@ -193,35 +198,124 @@ void PressKey(Display* display, const std::string& symbol) noexcept
   XFlush(display);
 }
 
+// Returns false if app should terminate
+bool WaitForMessage(Display* display) noexcept
+{
+  alignas(sizeof(uint32_t)) char size_char[sizeof(uint32_t)];
+  std::cin.read(size_char, sizeof(uint32_t));
+  uint32_t size;
+  std::memcpy(&size, size_char, sizeof(uint32_t));
+
+  if(size != 0)
+  {
+    char* message = new char[size];
+    std::cin.read(message, size);
+    //SendErrorString(std::string(message));
+    json parsed_message = json::parse(message, message + size);
+
+    json::iterator field_it;
+    if((field_it = parsed_message.find("symbol")) != parsed_message.end())
+      PressKey(display, *field_it);
+    else if((field_it = parsed_message.find("status")) != parsed_message.end())
+    {
+      if(*field_it == "close")
+      {
+        delete[] message;
+        return false;
+      }
+    }
+    else
+      SendErrorString("No known fields found in message");
+
+    delete[] message;
+  }
+  else
+    std::this_thread::sleep_for(kFetchDelay);
+
+  return true;
+}
+
+// usually symboll names we get from XkbGetKeyboard and XGetAtomName are formatted as
+// "pc_us_inet(evdev)_terminate(ctrl_alt_bksp)" but the correct syntax would be something like "+pc+us+inet(edev)+terminate(ctrl_alt_bksp)"
+void FormatSymbolNamesForSetting(std::string& symbol_names) noexcept
+{
+  if(symbol_names.empty())
+    return;
+    
+  symbol_names.insert(0, 1, '+');
+  int in_bracket = 0;
+  for(std::size_t i = 1; i < symbol_names.size(); ++i)
+  {
+    if(symbol_names[i] == '(') // I really hope that this approximation won't break anything
+      ++in_bracket;
+    else if(symbol_names[i] == ')')
+      --in_bracket;
+    else if(in_bracket == 0 && symbol_names[i] == '_')
+      symbol_names[i] = '+';
+  }
+}
+
+void SetXkbSymbolNames(Display* display, const std::string& symbol_names) noexcept
+{
+  if(symbol_names.empty())
+    return;
+
+  char* symbol_names_copy = strdup(symbol_names.c_str());
+
+  XkbComponentNamesRec names;
+  names.keymap = NULL;
+  names.keycodes = NULL;
+  names.types = NULL;
+  names.compat = NULL;
+  names.symbols = symbol_names_copy;
+  names.geometry = NULL;
+  XkbDescPtr keyboard_description = XkbGetKeyboardByName(display, XkbUseCoreKbd, &names, XkbGBN_AllComponentsMask, XkbGBN_AllComponentsMask, True);
+  if(!keyboard_description)
+    SendErrorString("Failed to change Keyboard layout");
+  else
+    XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
+}
+
+std::string GetXkbSymbolNames(Display* display) noexcept
+{
+  XkbDescPtr keyboard_description = XkbGetKeyboard(display, XkbAllComponentsMask, XkbUseCoreKbd);
+  if(!keyboard_description)
+  {
+    SendErrorString("Failed to get keyboard description");
+    return "";
+  }
+
+  char* symbol_atom_names = XGetAtomName(display, keyboard_description->names->symbols);
+  if(!symbol_atom_names)
+  {
+    XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
+    SendErrorString("Failed to get atom name");
+    return "";
+  }
+
+  std::string symbol_names = std::string(symbol_atom_names);
+  
+  XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
+  XFree(symbol_atom_names);
+
+  FormatSymbolNamesForSetting(symbol_names);
+  return symbol_names;
+}
+
 int main()
 {
   Display* display = XOpenDisplay(NULL);
 
+  std::string symbol_names = GetXkbSymbolNames(display);
+  SetXkbSymbolNames(display, "+de");
+
   while (true)
   {
-    alignas(sizeof(uint32_t)) char size_char[sizeof(uint32_t)];
-    std::cin.read(size_char, sizeof(uint32_t));
-    uint32_t size;
-    std::memcpy(&size, size_char, sizeof(uint32_t));
-
-    if(size != 0)
-    {
-      char* message = new char[size];
-      std::cin.read(message, size);
-      //SendErrorString(std::string(message));
-      json parsed_message = json::parse(message, message + size);
-      json::iterator symbol_it = parsed_message.find("symbol");
-      if(symbol_it == parsed_message.end())
-      {
-        SendErrorString("No \"symbol\" field in message");
-        continue;
-      }
-      PressKey(display, *symbol_it);
-      delete[] message;
-    }
-    else
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    if(!WaitForMessage(display))
+      break;
   }
+
+  SetXkbSymbolNames(display, symbol_names);
   
   XCloseDisplay(display);
   return 0;
