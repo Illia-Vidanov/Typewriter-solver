@@ -41,7 +41,7 @@ async function InjectionScript(storage_cache) {
 
   let worker_port = chrome.runtime.connect();
   function PrintLetter(symbol) {
-    worker_port.postMessage(symbol);
+    worker_port.postMessage(symbol.replaceAll("\u00a0", " ")); // no break space is simple space
   }
 
   function Lerp(a, b, t) {
@@ -83,15 +83,13 @@ async function InjectionScript(storage_cache) {
   console.log("Loaded options:", "\nERROR_PERCENTAGE = ", ERROR_PERCENTAGE, "\nMIN_TYPE_DELAY_MS = ", MIN_TYPE_DELAY_MS, "\nMAX_TYPE_DELAY_MS = ", MAX_TYPE_DELAY_MS);
 
   // Need to print first letter to get total char count
-  console.log("Emulating ", next_letter_element.textContent);
-  PrintLetter(next_letter_element.textContent.replaceAll("\u00a0", " "));
-  await new Promise(r => setTimeout(r, 20000));
-  //PrintLetter(next_letter_element.innerHTML.charCodeAt(0));
-  worker_port.disconnect();
-  return;
+  PrintLetter(next_letter_element.textContent);
+  // Or it twice if there were preparation window open
+  PrintLetter(next_letter_element.textContent);
+
   const letters_left_element = GetElementWithStyleAttribute("z-index: 999; position: relative; float: left; margin-left: 2px; top: -2px; font-weight: bold;");
   if(!letters_left_element) {
-    console.warn("Couldn't get char count left. Probobly can't type now. Stop");
+    console.error("Couldn't get char count left. Probobly can't type now. Stopping");
     return;
   }
   let error_count = Math.floor(parseFloat(letters_left_element.innerHTML) * ERROR_PERCENTAGE);
@@ -109,13 +107,16 @@ async function InjectionScript(storage_cache) {
         PrintLetter("b");
     }
     else
-      PrintLetter(next_letter_element.innerHTML);
+      PrintLetter(next_letter_element.textContent);
 
     next_letter_element = document.getElementById(next_letter_element.id);
     if(next_letter_element && !stop)
       setTimeout(MainLoop, Lerp(MIN_TYPE_DELAY_MS, MAX_TYPE_DELAY_MS, Math.random()));
     else
+    {
       console.log("Stopping execution");
+      worker_port.disconnect();
+    }
   }
   setTimeout(MainLoop);
 }
@@ -144,13 +145,22 @@ host_port.onDisconnect.addListener(() => {
 });
 
 chrome.action.onClicked.addListener(async () => {
-  console.log("service worker onClicked")
+  console.log("service worker onClicked");
+  chrome.action.setBadgeText({text: " "});
 
   let tab_id = (await GetCurrentTab()).id;
   // Stop running content script
   if(is_running)
+  {
+    chrome.action.setBadgeBackgroundColor({color:[255, 0, 0, 0]});
     chrome.tabs.sendMessage(tab_id, { stop: true });
+    host_port.postMessage({status: "disable"});
+    is_running = false;
+    return;
+  }
   
+  chrome.action.setBadgeBackgroundColor({color:[0, 255, 0, 0]});
+  host_port.postMessage({status: "enable"});
   is_running = true;
   chrome.scripting.executeScript({
     target: { tabId: tab_id },

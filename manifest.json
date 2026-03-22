@@ -13,7 +13,14 @@
   ],
   "action":
   {
-    "default_icon": "images/Cover128.png"
+    "default_icon":
+    {
+      "128": "images/Cover128.png",
+      "96": "images/Cover96.png",
+      "64": "images/Cover64.png",
+      "32": "images/Cover32.png",
+      "16": "images/Cover16.png"
+    }
   },
   "icons":
   {

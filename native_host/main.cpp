@@ -13,6 +13,9 @@
 using json = nlohmann::json;
 
 
+// Globals
+std::string initial_symbol_names;
+
 constexpr std::chrono::milliseconds kFetchDelay = std::chrono::milliseconds{10};
 
 // For debuging and testing purpuses
@@ -155,7 +158,7 @@ void PressKey(Display* display, const std::string& symbol) noexcept
     { "#",  { XK_numbersign,  0 } },
     { "*",  { XK_asterisk,    kShiftKeycode } },
     { "+",  { XK_plus,        0 } },
-    { "\'", { XK_apostrophe, kShiftKeycode } },
+    { "\'", { XK_apostrophe,  kShiftKeycode } },
     { ",",  { XK_colon,       0 } },
     { ".",  { XK_period,      0 } },
     { "-",  { XK_minus,       0 } },
@@ -223,6 +226,10 @@ bool WaitForMessage(Display* display) noexcept
         delete[] message;
         return false;
       }
+      else if(*field_it == "enable")
+        SetXkbSymbolNames(display, "+de");
+      else if(*field_it == "disable")
+        SetXkbSymbolNames(display, initial_symbol_names);
     }
     else
       SendErrorString("No known fields found in message");
@@ -306,16 +313,13 @@ int main()
 {
   Display* display = XOpenDisplay(NULL);
 
-  std::string symbol_names = GetXkbSymbolNames(display);
-  SetXkbSymbolNames(display, "+de");
+  std::string initial_symbol_names = GetXkbSymbolNames(display);
 
   while (true)
   {
     if(!WaitForMessage(display))
       break;
   }
-
-  SetXkbSymbolNames(display, symbol_names);
   
   XCloseDisplay(display);
   return 0;
