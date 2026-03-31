@@ -1,9 +1,4 @@
-commas doesn't work
-implement badge as a way to show state of extension
-
-Change layout only while actively typing
 Restructure
-correct error chance to always make number of errors
 rewrite readme to normal thing
 
 What to write in README

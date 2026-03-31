@@ -1,23 +1,16 @@
 import { GetStorageChache } from "../scripts/common.js";
 
-var is_running = false;
-
-async function GetCurrentTab() {
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if(!tab)
-    console.error("Couldn't get active tab");
-  return tab;
-}
-
 async function InjectionScript(storage_cache) {
   console.log("Injecting script");
 
-  let stop = false;
+  let enabled = true;
   chrome.runtime.onMessage.addListener(message => {
-    stop = message.stop;
+    enabled = message.enabled;
   });
 
   // Functions (must define them hiere because I can't import files in Injected file and this function is called from another context)
+  const sleep = (ms) => { return new Promise(r => setTimeout(r, ms)); };
+  
   const all_elements_with_style = document.querySelectorAll("*[style]");
   function GetElementWithStyleAttribute(style_attribute) {
     for(const element of all_elements_with_style) {
@@ -61,7 +54,7 @@ async function InjectionScript(storage_cache) {
   let style_attributes = ["background: rgba(84,84,84,0.2); ", "float: left; ", "position: relative; "];
   let next_letter_element = GetElementWithShuffledStyleAttributes(style_attributes);
   if(!next_letter_element)
-    console.log("couldn't find next_letter_element using style background: rgba(84,84,84,0.2); float: left; position: relative; and 5 other variations");
+    console.log("couldn't find next_letter_element using style " + style_attributes.join('') + " and other variations");
   
   console.log("Next letter id: " + next_letter_element.id);
 
@@ -84,24 +77,32 @@ async function InjectionScript(storage_cache) {
 
   // Need to print first letter to get total char count
   PrintLetter(next_letter_element.textContent);
+  // We need to re-get the element in order to update it's contents
+  // Or there is another way I am unaware of
+  next_letter_element = document.getElementById(next_letter_element.id);
+  await sleep(50);
   // Or it twice if there were preparation window open
   PrintLetter(next_letter_element.textContent);
 
+  // This isn't shuffeled
   const letters_left_element = GetElementWithStyleAttribute("z-index: 999; position: relative; float: left; margin-left: 2px; top: -2px; font-weight: bold;");
-  if(!letters_left_element) {
+  if(!letters_left_element)
+  {
     console.error("Couldn't get char count left. Probobly can't type now. Stopping");
     return;
   }
-  let error_count = Math.floor(parseFloat(letters_left_element.innerHTML) * ERROR_PERCENTAGE);
-  console.log("Desired error count: " + error_count);
+  
+  let error_count = Math.floor(parseFloat(letters_left_element.textContent) * ERROR_PERCENTAGE);
+  console.log("Desired error count: " + error_count.toString());
 
   // Main loop
   function MainLoop() {
     // Here is no check for if typing is paused, but it shouldn't be big of an issue
-    if(Math.random() < ERROR_PERCENTAGE && error_count > 0) {
+
+    if(Math.random() < (error_count / parseFloat(letters_left_element.textContent))) {
       error_count--;
       // Way to type always wrong letter
-      if(next_letter_element.innerHTML == "a")
+      if(next_letter_element.textContent == "a")
         PrintLetter("a");
       else
         PrintLetter("b");
@@ -110,28 +111,36 @@ async function InjectionScript(storage_cache) {
       PrintLetter(next_letter_element.textContent);
 
     next_letter_element = document.getElementById(next_letter_element.id);
-    if(next_letter_element && !stop)
+    if(next_letter_element && enabled)
       setTimeout(MainLoop, Lerp(MIN_TYPE_DELAY_MS, MAX_TYPE_DELAY_MS, Math.random()));
     else
     {
-      console.log("Stopping execution");
       worker_port.disconnect();
+      console.log("Stopping execution");
     }
   }
   setTimeout(MainLoop);
+} // Injected script
+
+let is_running = false;
+let tab_id;
+
+const sleep = (ms) => { return new Promise(r => setTimeout(r, ms)); };
+
+async function GetCurrentTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if(!tab)
+    console.error("Couldn't get active tab");
+  return tab;
 }
 
-// Treat every message as a key to press
-function OnMessage(symbol) {
-  console.log("Emulating ", symbol);
-  host_port.postMessage({symbol: symbol});
-}
 chrome.runtime.onConnect.addListener((port) => {
   console.log("Content script and service worker connected");
   port.onMessage.addListener(OnMessage);
   port.onDisconnect.addListener((port) => {
     console.log("Content script and service worker disconnected");
     port.onMessage.removeListener(OnMessage);
+    DisableTyping();
   });
 });
 
@@ -144,27 +153,75 @@ host_port.onDisconnect.addListener(() => {
   console.log("Native host disconnected");
 });
 
+// Set default bage as disabled
+chrome.action.setBadgeText({text: " "});
+chrome.action.setBadgeBackgroundColor({color:[255, 0, 0, 255]});
+
+function DisableTyping() {
+  chrome.action.setBadgeBackgroundColor({color:[255, 0, 0, 255]});
+  // If active tab changed because typewriter tab was changed for example after finishing level we don't want an error
+  try { chrome.tabs.sendMessage(tab_id, { enabled: false }); } catch {}
+  host_port.postMessage({status: "disable"});
+  is_running = false;
+}
+
+function EnableTyping() {
+  chrome.action.setBadgeBackgroundColor({color:[0, 255, 0, 255]});
+  host_port.postMessage({status: "enable"});
+  chrome.tabs.sendMessage(tab_id, { enabled: true });
+  is_running = true;
+}
+
+// If active tab changed change layout to normal
+chrome.tabs.onActivated.addListener((active_info) => {
+  if(tab_id)
+    DisableTyping();
+  tab_id = undefined;
+});
+
+chrome.tabs.onUpdated.addListener(async (changed_tab_id, change_info, tab) => {
+  if(changed_tab_id == tab_id && change_info.url && change_info.url.includes("levelCompleteInfo"))
+  {
+    console.log("Finished lection moving to the next one");
+    await chrome.tabs.update(tab_id, {url: "https://at4.typewriter.at/index.php?r=typewriter/runLevel"});
+    await sleep(2000);
+    EnableTyping();
+    InjectScript();
+  }
+});
+
+// Messages from content script treated as key emulations
+function OnMessage(message) {
+  //console.log("Emulating ", message);
+  host_port.postMessage({symbol: message});
+}
+
 chrome.action.onClicked.addListener(async () => {
   console.log("service worker onClicked");
-  chrome.action.setBadgeText({text: " "});
+  
+  let tab = await GetCurrentTab();
+  if(!tab.url.includes("typewriter"))
+  {
+    console.error("This isn't typewriter");
+    return;
+  }
 
-  let tab_id = (await GetCurrentTab()).id;
+  tab_id = tab.id;
   // Stop running content script
   if(is_running)
   {
-    chrome.action.setBadgeBackgroundColor({color:[255, 0, 0, 0]});
-    chrome.tabs.sendMessage(tab_id, { stop: true });
-    host_port.postMessage({status: "disable"});
-    is_running = false;
+    DisableTyping();
     return;
   }
   
-  chrome.action.setBadgeBackgroundColor({color:[0, 255, 0, 0]});
-  host_port.postMessage({status: "enable"});
-  is_running = true;
+  EnableTyping();
+  InjectScript();
+});
+
+async function InjectScript() {
   chrome.scripting.executeScript({
     target: { tabId: tab_id },
     func: InjectionScript,
     args: [ (await GetStorageChache()) ]
   });
-});
+}

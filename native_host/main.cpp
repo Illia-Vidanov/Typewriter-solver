@@ -256,11 +256,12 @@ void PressKey(Display* display, const std::string& symbol) noexcept
     return;
   }
 
+  /*
   json message;
   message["symbol"] = symbol;
   message["keysym"] = it->second.first;
   message["keycode"] = keycode;
-  SendMessage(message);
+  SendMessage(message); */
 
   if(it->second.second)
     XTestFakeKeyEvent(display, it->second.second, True, 0);
