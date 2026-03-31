@@ -55,6 +55,77 @@ void SendErrorString(const std::string& string) noexcept
     SendErrorMessage(message);
 }
 
+
+
+// usually symboll names we get from XkbGetKeyboard and XGetAtomName are formatted as
+// "pc_us_inet(evdev)_terminate(ctrl_alt_bksp)" but the correct syntax would be something like "+pc+us+inet(edev)+terminate(ctrl_alt_bksp)"
+void FormatSymbolNamesForSetting(std::string& symbol_names) noexcept
+{
+  if(symbol_names.empty())
+    return;
+    
+  symbol_names.insert(0, 1, '+');
+  int in_bracket = 0;
+  for(std::size_t i = 1; i < symbol_names.size(); ++i)
+  {
+    if(symbol_names[i] == '(') // I really hope that this approximation won't break anything
+      ++in_bracket;
+    else if(symbol_names[i] == ')')
+      --in_bracket;
+    else if(in_bracket == 0 && symbol_names[i] == '_')
+      symbol_names[i] = '+';
+  }
+}
+
+void SetXkbSymbolNames(Display* display, const std::string& symbol_names) noexcept
+{
+  if(symbol_names.empty())
+    return;
+
+  char* symbol_names_copy = strdup(symbol_names.c_str());
+
+  XkbComponentNamesRec names;
+  names.keymap = NULL;
+  names.keycodes = NULL;
+  names.types = NULL;
+  names.compat = NULL;
+  names.symbols = symbol_names_copy;
+  names.geometry = NULL;
+  XkbDescPtr keyboard_description = XkbGetKeyboardByName(display, XkbUseCoreKbd, &names, XkbGBN_AllComponentsMask, XkbGBN_AllComponentsMask, True);
+  if(!keyboard_description)
+    SendErrorString("Failed to change Keyboard layout");
+  else
+    XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
+}
+
+std::string GetXkbSymbolNames(Display* display) noexcept
+{
+  XkbDescPtr keyboard_description = XkbGetKeyboard(display, XkbAllComponentsMask, XkbUseCoreKbd);
+  if(!keyboard_description)
+  {
+    SendErrorString("Failed to get keyboard description");
+    return "";
+  }
+
+  char* symbol_atom_names = XGetAtomName(display, keyboard_description->names->symbols);
+  if(!symbol_atom_names)
+  {
+    XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
+    SendErrorString("Failed to get atom name");
+    return "";
+  }
+
+  std::string symbol_names = std::string(symbol_atom_names);
+  
+  XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
+  XFree(symbol_atom_names);
+
+  FormatSymbolNamesForSetting(symbol_names);
+  return symbol_names;
+}
+
+
+
 void PressKey(Display* display, const std::string& symbol) noexcept
 {
   static const KeyCode kShiftKeycode = XKeysymToKeycode(display, XK_Shift_L);
@@ -159,7 +230,7 @@ void PressKey(Display* display, const std::string& symbol) noexcept
     { "*",  { XK_asterisk,    kShiftKeycode } },
     { "+",  { XK_plus,        0 } },
     { "\'", { XK_apostrophe,  kShiftKeycode } },
-    { ",",  { XK_colon,       0 } },
+    { ",",  { XK_comma,       0 } },
     { ".",  { XK_period,      0 } },
     { "-",  { XK_minus,       0 } },
     { "_",  { XK_underscore,  kShiftKeycode } },
@@ -242,78 +313,13 @@ bool WaitForMessage(Display* display) noexcept
   return true;
 }
 
-// usually symboll names we get from XkbGetKeyboard and XGetAtomName are formatted as
-// "pc_us_inet(evdev)_terminate(ctrl_alt_bksp)" but the correct syntax would be something like "+pc+us+inet(edev)+terminate(ctrl_alt_bksp)"
-void FormatSymbolNamesForSetting(std::string& symbol_names) noexcept
-{
-  if(symbol_names.empty())
-    return;
-    
-  symbol_names.insert(0, 1, '+');
-  int in_bracket = 0;
-  for(std::size_t i = 1; i < symbol_names.size(); ++i)
-  {
-    if(symbol_names[i] == '(') // I really hope that this approximation won't break anything
-      ++in_bracket;
-    else if(symbol_names[i] == ')')
-      --in_bracket;
-    else if(in_bracket == 0 && symbol_names[i] == '_')
-      symbol_names[i] = '+';
-  }
-}
 
-void SetXkbSymbolNames(Display* display, const std::string& symbol_names) noexcept
-{
-  if(symbol_names.empty())
-    return;
-
-  char* symbol_names_copy = strdup(symbol_names.c_str());
-
-  XkbComponentNamesRec names;
-  names.keymap = NULL;
-  names.keycodes = NULL;
-  names.types = NULL;
-  names.compat = NULL;
-  names.symbols = symbol_names_copy;
-  names.geometry = NULL;
-  XkbDescPtr keyboard_description = XkbGetKeyboardByName(display, XkbUseCoreKbd, &names, XkbGBN_AllComponentsMask, XkbGBN_AllComponentsMask, True);
-  if(!keyboard_description)
-    SendErrorString("Failed to change Keyboard layout");
-  else
-    XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
-}
-
-std::string GetXkbSymbolNames(Display* display) noexcept
-{
-  XkbDescPtr keyboard_description = XkbGetKeyboard(display, XkbAllComponentsMask, XkbUseCoreKbd);
-  if(!keyboard_description)
-  {
-    SendErrorString("Failed to get keyboard description");
-    return "";
-  }
-
-  char* symbol_atom_names = XGetAtomName(display, keyboard_description->names->symbols);
-  if(!symbol_atom_names)
-  {
-    XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
-    SendErrorString("Failed to get atom name");
-    return "";
-  }
-
-  std::string symbol_names = std::string(symbol_atom_names);
-  
-  XkbFreeKeyboard(keyboard_description, XkbAllComponentsMask, True);
-  XFree(symbol_atom_names);
-
-  FormatSymbolNamesForSetting(symbol_names);
-  return symbol_names;
-}
 
 int main()
 {
   Display* display = XOpenDisplay(NULL);
 
-  std::string initial_symbol_names = GetXkbSymbolNames(display);
+  initial_symbol_names = GetXkbSymbolNames(display);
 
   while (true)
   {
