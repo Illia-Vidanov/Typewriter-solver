@@ -77,11 +77,13 @@ async function InjectionScript(storage_cache) {
 
   // Need to print first letter to get total char count
   PrintLetter(next_letter_element.textContent);
-  // We need to re-get the element in order to update it's contents
-  // Or there is another way I am unaware of
-  next_letter_element = document.getElementById(next_letter_element.id);
-  await sleep(50);
+  // There is a phantom error on that second printletter I can't solve
+  // It sees right letter types the right one but it's still counted as a mistake
+  //await sleep(1000);
+  //next_letter_element = document.getElementById(next_letter_element.id);
+  //await sleep(1000);
   // Or it twice if there were preparation window open
+  console.log(next_letter_element.textContent);
   PrintLetter(next_letter_element.textContent);
 
   // This isn't shuffeled
@@ -110,8 +112,7 @@ async function InjectionScript(storage_cache) {
     else
       PrintLetter(next_letter_element.textContent);
 
-    next_letter_element = document.getElementById(next_letter_element.id);
-    if(next_letter_element && enabled)
+    if(enabled)
       setTimeout(MainLoop, Lerp(MIN_TYPE_DELAY_MS, MAX_TYPE_DELAY_MS, Math.random()));
     else
     {

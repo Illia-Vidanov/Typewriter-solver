@@ -23,7 +23,12 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # Target
-add_executable(${PROJECT_NAME} main.cpp)
+# TODO: platform recognition
+add_executable(${PROJECT_NAME}
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Communication.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/PlatformLinux.cpp
+)
 
 set_target_properties(
   ${PROJECT_NAME} PROPERTIES

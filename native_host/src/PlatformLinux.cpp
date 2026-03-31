@@ -1,60 +1,13 @@
-#include <iostream>
-#include <stdint.h>
-#include <string.h>
-#include <thread>
-#include <cstdlib>
+#include "PlatformLinux.hpp"
+
+#include "Setup.hpp"
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 #include <X11/XKBlib.h>
 
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
-
-
-// Globals
-std::string initial_symbol_names;
-
-constexpr std::chrono::milliseconds kFetchDelay = std::chrono::milliseconds{10};
-
-// For debuging and testing purpuses
-void SendMessage(const json& message_json) noexcept
-{
-  const std::string& message = message_json.dump();
-  uint32_t size = message.size();
-  alignas(sizeof(uint32_t)) char size_char[sizeof(uint32_t)];
-  std::memcpy(size_char, &size, sizeof(uint32_t));
-  std::cout.write(size_char, 4);
-  std::cout.write(message.data(), size);
-  std::cout.flush();
-}
-
-// Open chrome with "google-chrome-stable --enable-logging=stderr --log-level=0" to view errors
-void SendErrorMessage(const json& message_json) noexcept
-{
-  const std::string& message = message_json.dump();
-  uint32_t size = message.size();
-  alignas(sizeof(uint32_t)) char size_char[sizeof(uint32_t)];
-  std::memcpy(size_char, &size, sizeof(uint32_t));
-  std::cerr.write(size_char, 4);
-  std::cerr.write(message.data(), size);
-}
-
-void SendString(const std::string& string) noexcept
-{
-    json message;
-    message["Message"] = string;
-    SendMessage(message);
-}
-
-void SendErrorString(const std::string& string) noexcept
-{
-    json message;
-    message["Error"] = string;
-    SendErrorMessage(message);
-}
-
+#include "Communication.hpp"
 
 
 // usually symboll names we get from XkbGetKeyboard and XGetAtomName are formatted as
@@ -123,8 +76,6 @@ std::string GetXkbSymbolNames(Display* display) noexcept
   FormatSymbolNamesForSetting(symbol_names);
   return symbol_names;
 }
-
-
 
 void PressKey(Display* display, const std::string& symbol) noexcept
 {
@@ -271,63 +222,4 @@ void PressKey(Display* display, const std::string& symbol) noexcept
     XTestFakeKeyEvent(display, it->second.second, False, 0);
 
   XFlush(display);
-}
-
-// Returns false if app should terminate
-bool WaitForMessage(Display* display) noexcept
-{
-  alignas(sizeof(uint32_t)) char size_char[sizeof(uint32_t)];
-  std::cin.read(size_char, sizeof(uint32_t));
-  uint32_t size;
-  std::memcpy(&size, size_char, sizeof(uint32_t));
-
-  if(size != 0)
-  {
-    char* message = new char[size];
-    std::cin.read(message, size);
-    //SendErrorString(std::string(message));
-    json parsed_message = json::parse(message, message + size);
-
-    json::iterator field_it;
-    if((field_it = parsed_message.find("symbol")) != parsed_message.end())
-      PressKey(display, *field_it);
-    else if((field_it = parsed_message.find("status")) != parsed_message.end())
-    {
-      if(*field_it == "close")
-      {
-        delete[] message;
-        return false;
-      }
-      else if(*field_it == "enable")
-        SetXkbSymbolNames(display, "+de");
-      else if(*field_it == "disable")
-        SetXkbSymbolNames(display, initial_symbol_names);
-    }
-    else
-      SendErrorString("No known fields found in message");
-
-    delete[] message;
-  }
-  else
-    std::this_thread::sleep_for(kFetchDelay);
-
-  return true;
-}
-
-
-
-int main()
-{
-  Display* display = XOpenDisplay(NULL);
-
-  initial_symbol_names = GetXkbSymbolNames(display);
-
-  while (true)
-  {
-    if(!WaitForMessage(display))
-      break;
-  }
-  
-  XCloseDisplay(display);
-  return 0;
 }
